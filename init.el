@@ -6,8 +6,6 @@
   (error "Config not tested on v%s. Please use v26.3 or higher." emacs-version))
 
 (add-to-list 'default-frame-alist '(fullscreen . maximized))
-(add-to-list 'default-frame-alist
-             '(font . "Monaco-14"))
 
 (setq backup-directory-alist '(("." . "~/.emacsbackups")))
 
@@ -60,6 +58,9 @@
 (pm/use 'base16-theme)
 (load-theme 'base16-zenburn t)
 
+;; silence native comp warnings buffer
+(setq native-comp-async-report-warnings-errors 'silent)
+
 ;;;
 ;;; OS Specific
 ;;;
@@ -67,7 +68,7 @@
 (defvar dump-loc "")
 
 (when (eq system-type 'windows-nt)
-  (set-face-attribute 'default nil :font "Terminus-13")
+  (set-face-attribute 'default nil :font "Consolas-12")
   (setq cfg-loc "C:/Users/ja/AppData/Roaming/.emacs.d/init.el")
   (setq default-directory "C:/Workspace/"))
 
@@ -79,7 +80,7 @@
 
 (when (eq system-type 'gnu/linux)
   (setq cfg-loc "~/.emacs.d/init.el")
-  (set-face-attribute 'default nil :font "Terminus-12"))
+  (set-face-attribute 'default nil :font "Hack-12"))
 
 ;;;
 ;;; Window and Layout Handling
@@ -245,7 +246,8 @@
 (setq org-html-html5-fancy t
       org-html-doctype "html5")
 
-;; LLMs 
+;; LLMs
+(pm/use 'gptel)
 (setq gptel-api-key "")
 (gptel-make-gemini "Gemini" :key "" :models '("gemini-1.5-flash" "gemini-pro") :stream t)
 
