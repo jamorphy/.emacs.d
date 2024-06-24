@@ -47,10 +47,6 @@
       confirm-kill-emacs 'yes-or-no-p
       switch-to-buffer-obey-display-actions t)
 
-;; Disable scroll bar on frame
-(add-to-list 'default-frame-alist
-             '(vertical-scroll-bars . nil))
-
 (setq-default indicate-empty-lines t
 			  indent-tabs-mode nil
               tab-width 4)
@@ -81,6 +77,7 @@
 (when (eq system-type 'gnu/linux)
   (setq cfg-loc "~/.emacs.d/init.el")
   (set-face-attribute 'default nil :font "Hack-12"))
+
 
 ;;;
 ;;; Window and Layout Handling
@@ -259,3 +256,35 @@
   :models '("mixtral-8x7b-32768"
             "llama3-70b-8192"
             "llama3-8b-8192"))
+
+;; Disable scroll bar on frame
+(add-to-list 'default-frame-alist
+             '(vertical-scroll-bars . nil))
+
+
+(defun my/set-default-font ()
+  (set-face-attribute 'default nil :font "Monaco-14"))
+
+(add-hook 'after-make-frame-functions
+          (lambda (frame)
+            (with-selected-frame frame
+              (my/set-default-font))))
+
+
+(defun launch-alt-frame ()
+  "Launch a new frame with a 'whiteboard'-like appearance."
+  (interactive)
+  (let ((new-frame (make-frame)))
+    (select-frame new-frame)
+    ;; Set frame-specific face attributes to mimic the 'whiteboard' theme
+    (set-face-attribute 'default new-frame :background "white" :foreground "black")
+    (set-face-attribute 'fringe new-frame :background "white")
+    (set-face-attribute 'mode-line new-frame :background "grey75" :foreground "black" :box nil)
+    (set-face-attribute 'mode-line-inactive new-frame :background "grey90" :foreground "black" :box nil)
+    ;; Line numbers
+    (set-face-attribute 'line-number new-frame :background "white" :foreground "gray")
+    (set-face-attribute 'line-number-current-line new-frame :background "white" :foreground "black")
+    ;; Highlight current line
+    (set-face-attribute 'hl-line new-frame :background "lightgrey")
+    ;; Additional face settings can be added here to further mimic the 'whiteboard' theme
+    ))
