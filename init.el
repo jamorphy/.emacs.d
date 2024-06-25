@@ -2,16 +2,19 @@
 ;;; Commentary
 ;;; Code:
 
-(when (version<  emacs-version "26.3")
-  (error "Config not tested on v%s. Please use v26.3 or higher." emacs-version))
+(when (version<  emacs-version "30.0")
+  (error "Config not tested on v%s. Please use v30.0 or higher." emacs-version))
 
 (add-to-list 'default-frame-alist '(fullscreen . maximized))
 
 (setq backup-directory-alist '(("." . "~/.emacsbackups")))
 
+(setq package-archives
+      '(("melpa" . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/melpa/")
+        ("org"   . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/org/")
+        ("gnu"   . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/gnu/")))
 (package-initialize)
 
-(add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t)
 (unless (bound-and-true-p package--initialized)
   (setq package-enable-at-startup nil) ;; Prevent double-loading packages
   (package-initialize))
@@ -48,7 +51,7 @@
       switch-to-buffer-obey-display-actions t)
 
 (setq-default indicate-empty-lines t
-			  indent-tabs-mode nil
+              indent-tabs-mode nil
               tab-width 4)
 
 (pm/use 'base16-theme)
@@ -88,9 +91,9 @@
 (global-set-key (kbd "C-c f") 'switch-to-next-buffer)
 (global-unset-key (kbd "M-o"))
 (global-unset-key (kbd "M-`"))
-;;(global-unset-key (kbd "M-o M-o"))
 (global-set-key (kbd "M-o") (lambda () (interactive) (other-window 1)))
 (global-set-key (kbd "M-O") (lambda () (interactive) (other-window -1)))
+
 
 (defun save-layout-delete-other-windows ()
   "Save the current layout and focus on current window."
@@ -103,13 +106,13 @@
   "Go to saved window layout"
   (jump-to-register ?-))
 
-(global-set-key (kbd "C-.") 'switch-to-buffer)
+(global-set-key (kbd "C-;") 'switch-to-buffer)
 (global-set-key (kbd "C-x 1") 'save-layout-delete-other-windows)
-(global-set-key (kbd "C-c w") 'goto-saved-layout)                
+(global-set-key (kbd "C-c w") 'goto-saved-layout)
 
 ;;;
 ;;; Editing
-;;;                
+;;;
 (global-set-key (kbd "C-c /") 'comment-or-uncomment-region)
 (pm/use 'multiple-cursors)
 (global-set-key (kbd "C->") 'mc/mark-next-like-this)
@@ -121,7 +124,7 @@
 
 (pm/use 'expand-region)
 (global-set-key (kbd "M-;") 'er/expand-region)
-                
+
 ;;;
 ;;; Programming Modes
 ;;;
@@ -134,8 +137,6 @@
             (setq js-indent-level 'js-tabwidth)))
 
 (setq c-set-style "k&r")
-
-
 (setq c-basic-offset 4)
 
 (pm/use 'magit)
@@ -171,11 +172,6 @@
 (pm/use 'which-key)
 (which-key-mode)
 
-(pm/use 'perspective)
-(customize-set-variable 'persp-mode-prefix-key (kbd "C-c x"))
-(global-set-key (kbd "C-x C-b") 'persp-list-buffers)
-(persp-mode)
-
 (global-set-key (kbd "M-i") 'imenu)
 (setq imenu-auto-rescan t)
 (custom-set-variables
@@ -203,56 +199,28 @@
  ;; If there is more than one, they won't work right.
  )
 
-;;(require 'org-annotation-helper)
-
 ;; LSP
 (add-hook 'eglot--managed-mode-hook (lambda () (flymake-mode -1)))
 (add-hook 'c-mode-hook 'eglot-ensure)
 (add-hook 'python-mode-hook 'eglot-ensure)
 
-
 ;; Org
-;; TODO: move to another file
-(setq org-html-preamble t)
-(setq org-html-preamble
-      (concat
-       "<div style='display: flex; justify-content: center'>"
-       "<ul id='banner'>"
-       "<li> <a href='../../index.html'><< back</a></li>"
-       "</ul>"
-       "</div>"
-       "<style>"
-      "#banner { margin:0; list-style-type: none }"
-      "#banner li {"
-      "  float: left;"
-      "}"
-      "#banner li a, #banner li a:visited {"
-        "display: block;"
-        "padding: 10px;"
-        "color: #07a;"
-        "text-decoration: none;"
-      "}"
-      "</style><br>"))
-
-(setq org-html-postamble t)
-(setq org-html-postamble-format '(("en" "<p class='date'>Last updated: %C</p>"))
-      org-html-head-include-scripts nil
-      org-html-head-include-default-style nil
-      )
-
-(setq org-html-html5-fancy t
-      org-html-doctype "html5")
+(load-file "~/.emacs.d/om.el")
 
 ;; LLMs
+(load-file "~/.emacs.d/secrets.el")
+
 (pm/use 'gptel)
-(setq gptel-api-key "")
-(gptel-make-gemini "Gemini" :key "" :models '("gemini-1.5-flash" "gemini-pro") :stream t)
+(global-set-key (kbd "C-c m s") 'gptel-send)
+(global-set-key (kbd "C-c m m") 'gptel-menu)
+(setq gptel-api-key 'openai-api-key)
+(gptel-make-gemini "Gemini" :key 'gemini-api-key :models '("gemini-1.5-flash" "gemini-pro") :stream t)
 
 (gptel-make-openai "Groq"               ;Any name you want
   :host "api.groq.com"
   :endpoint "/openai/v1/chat/completions"
   :stream t
-  :key ""
+  :key 'grok-api-key
   :models '("mixtral-8x7b-32768"
             "llama3-70b-8192"
             "llama3-8b-8192"))
@@ -269,7 +237,6 @@
           (lambda (frame)
             (with-selected-frame frame
               (my/set-default-font))))
-
 
 (defun launch-alt-frame ()
   "Launch a new frame with a 'whiteboard'-like appearance."
