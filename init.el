@@ -5,7 +5,10 @@
 (when (version<  emacs-version "30.0")
   (error "Config not tested on v%s. Please use v30.0 or higher." emacs-version))
 
-(add-to-list 'default-frame-alist '(fullscreen . maximized))
+(setq default-frame-alist
+      '((font . "Monaco-13")
+        (fullscreen . maximized)
+        (vertical-scroll-bars . nil)))
 
 (setq backup-directory-alist '(("." . "~/.emacsbackups")))
 
@@ -54,11 +57,18 @@
               indent-tabs-mode nil
               tab-width 4)
 
+;;
+;; Local packages
+;;
+(add-to-list 'load-path "~/.emacs.d/custom/")
+
 (pm/use 'base16-theme)
 (load-theme 'base16-zenburn t)
 
-;; silence native comp warnings buffer
 (setq native-comp-async-report-warnings-errors 'silent)
+
+(setopt display-fill-column-indicator-column 80)
+(add-hook 'prog-mode-hook 'display-fill-column-indicator-mode)
 
 ;;;
 ;;; OS Specific
@@ -74,13 +84,12 @@
 (when (eq system-type 'darwin)
   (setq mac-command-modifier 'meta)
   (setq cfg-loc "~/.emacs.d/init.el")
-  (setq dump-loc "~/Workspace/sync/dump.org")
-  (set-face-attribute 'default nil :font "Monaco-14"))
+  (setq dump-loc "~/Workspace/sync/dump.org"))
+;;  (set-face-attribute 'default nil :font "Monaco-14"))
 
 (when (eq system-type 'gnu/linux)
   (setq cfg-loc "~/.emacs.d/init.el")
   (set-face-attribute 'default nil :font "Hack-12"))
-
 
 ;;;
 ;;; Window and Layout Handling
@@ -109,6 +118,8 @@
 (global-set-key (kbd "C-;") 'switch-to-buffer)
 (global-set-key (kbd "C-x 1") 'save-layout-delete-other-windows)
 (global-set-key (kbd "C-c w") 'goto-saved-layout)
+(global-unset-key (kbd "C-x `"))
+(global-unset-key (kbd "C-z"))
 
 ;;;
 ;;; Editing
@@ -142,6 +153,10 @@
 (pm/use 'magit)
 
 ;;;
+;;; Projects
+;;; TODO
+
+;;;
 ;;; Compilation
 ;;;
 (global-set-key (kbd "C-c r") (lambda () (interactive) (recompile)))
@@ -158,9 +173,6 @@
   "Open dump.org"
   (interactive)
   (find-file dump-loc))
-
-(global-unset-key (kbd "C-x `"))
-(global-unset-key (kbd "C-z"))
 
 ;;;
 ;;; UI
@@ -185,11 +197,14 @@
      "623e9fe0532cc3a0bb31929b991a16f72fad7ad9148ba2dc81e395cd70afc744"
      "e8915dac580af7a4a57bd38a0638a5a7714b47714529b1a66bd19e7aa155818d"
      default))
+ '(eglot-ignored-server-capabilities
+   '(:hoverProvider :completionProvider :codeActionProvider
+                    :documentLinkProvider :foldingRangeProvider))
  '(package-selected-packages
-   '(amx base16-theme expand-region go-mode gptel icomplete-vertical
-         json-mode magit markdown-mode move-text multiple-cursors
-         perspective request twittering-mode vs-light-theme which-key
-         whiteboard yaml-mode))
+   '(amx base16-theme bufferlo expand-region go-mode gptel
+         icomplete-vertical json-mode magit markdown-mode move-text
+         multiple-cursors request twittering-mode vs-light-theme
+         which-key whiteboard yaml-mode))
  '(persp-modestring-short t)
  '(persp-show-modestring t))
 (custom-set-faces
@@ -199,59 +214,91 @@
  ;; If there is more than one, they won't work right.
  )
 
+;;
 ;; LSP
+;;
 (add-hook 'eglot--managed-mode-hook (lambda () (flymake-mode -1)))
-(add-hook 'c-mode-hook 'eglot-ensure)
-(add-hook 'python-mode-hook 'eglot-ensure)
+(add-hook 'prog-mode-hook 'eglot-ensure)
 
 ;; Org
 (load-file "~/.emacs.d/om.el")
 
+(pm/use 'bufferlo)
+
+;;
 ;; LLMs
+;;
+
 (load-file "~/.emacs.d/secrets.el")
 
-(pm/use 'gptel)
-(global-set-key (kbd "C-c m s") 'gptel-send)
-(global-set-key (kbd "C-c m m") 'gptel-menu)
-(setq gptel-api-key 'openai-api-key)
-(gptel-make-gemini "Gemini" :key 'gemini-api-key :models '("gemini-1.5-flash" "gemini-pro") :stream t)
+(require 'ezllm)
 
-(gptel-make-openai "Groq"               ;Any name you want
-  :host "api.groq.com"
-  :endpoint "/openai/v1/chat/completions"
-  :stream t
-  :key 'grok-api-key
-  :models '("mixtral-8x7b-32768"
-            "llama3-70b-8192"
-            "llama3-8b-8192"))
+(global-set-key (kbd "C-c m") 'ezllm-send)
 
-;; Disable scroll bar on frame
-(add-to-list 'default-frame-alist
-             '(vertical-scroll-bars . nil))
+(setq sysprompt "You are a code generator. Only output valid code based on the prompt or comment. Do not talk at all. Only output valid code. Do not provide any backticks that surround the code. Never ever output backticks like this ```. Other comments should left alone. Do not output backticks. Never output emojis.")
 
+(ezllm-configure-provider :name 'llama-3.1-8b
+                          :spec ezllm-openai
+                          :endpoint "https://api.groq.com/openai/v1/chat/completions"
+                          :model "llama-3.1-8b-instant"
+                          :max-tokens 3000
+                          :api-key groq-api-key
+                          :system-prompt sysprompt)
 
-(defun my/set-default-font ()
-  (set-face-attribute 'default nil :font "Monaco-14"))
+(ezllm-configure-provider :name 'llama-3.1-70b
+                          :spec ezllm-openai
+                          :endpoint "https://api.groq.com/openai/v1/chat/completions"
+                          :model "llama-3.1-70b-versatile"
+                          :max-tokens 3000
+                          :api-key groq-api-key
+                          :system-prompt sysprompt)
 
-(add-hook 'after-make-frame-functions
-          (lambda (frame)
-            (with-selected-frame frame
-              (my/set-default-font))))
+(ezllm-configure-provider :name 'mixtral-8x7b
+                          :spec ezllm-openai
+                          :endpoint "https://api.groq.com/openai/v1/chat/completions"
+                          :model "mixtral-8x7b-32768"
+                          :max-tokens 2048
+                          :api-key groq-api-key
+                          :system-prompt sysprompt)
 
-(defun launch-alt-frame ()
-  "Launch a new frame with a 'whiteboard'-like appearance."
-  (interactive)
-  (let ((new-frame (make-frame)))
-    (select-frame new-frame)
-    ;; Set frame-specific face attributes to mimic the 'whiteboard' theme
-    (set-face-attribute 'default new-frame :background "white" :foreground "black")
-    (set-face-attribute 'fringe new-frame :background "white")
-    (set-face-attribute 'mode-line new-frame :background "grey75" :foreground "black" :box nil)
-    (set-face-attribute 'mode-line-inactive new-frame :background "grey90" :foreground "black" :box nil)
-    ;; Line numbers
-    (set-face-attribute 'line-number new-frame :background "white" :foreground "gray")
-    (set-face-attribute 'line-number-current-line new-frame :background "white" :foreground "black")
-    ;; Highlight current line
-    (set-face-attribute 'hl-line new-frame :background "lightgrey")
-    ;; Additional face settings can be added here to further mimic the 'whiteboard' theme
-    ))
+(ezllm-configure-provider :name 'sonnet-3.5
+                          :spec ezllm-anthropic
+                          :endpoint "https://api.anthropic.com/v1/messages"
+                          :model "claude-3-5-sonnet-20240620"
+                          :max-tokens 1024
+                          :api-key claude-api-key
+                          :system-prompt sysprompt)
+
+(ezllm-configure-provider :name 'gpt-4-turbo
+                          :spec ezllm-openai
+                          :endpoint "https://api.openai.com/v1/chat/completions"
+                          :model "gpt-4-turbo"
+                          :max-tokens 2048
+                          :api-key openai-api-key
+                          :system-prompt sysprompt)
+
+(ezllm-configure-provider :name 'gpt-4o-mini
+                          :spec ezllm-openai
+                          :endpoint "https://api.openai.com/v1/chat/completions"
+                          :model "gpt-4o-mini"
+                          :max-tokens 2048
+                          :api-key openai-api-key
+                          :system-prompt "you are a helpful assistant")
+
+(ezllm-configure-provider :name 'mistral-large-2
+                          :spec ezllm-openai
+                          :endpoint "https://api.mistral.ai/v1/chat/completions"
+                          :model "mistral-large-2407"
+                          :max-tokens 3500
+                          :api-key mistral-api-key
+                          :system-prompt sysprompt)
+
+(ezllm-configure-provider :name 'deepseek-coder
+                          :spec ezllm-openai
+                          :endpoint "https://api.deepseek.com/chat/completions"
+                          :model "deepseek-coder"
+                          :max-tokens 3000
+                          :api-key deepseek-api-key
+                          :system-prompt sysprompt)
+
+(ezllm-set-provider 'llama-3.1-70b)
