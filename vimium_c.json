@@ -1,0 +1,27 @@
+{
+	"name": "Vimium C",
+	"@time": "8/7/2024, 11:11:13 PM",
+	"time": 1723097473381,
+	"environment": {
+		"extension": "2.11.3",
+		"platform": "mac",
+		"chromium": 127
+	},
+	"keyLayout": 2,
+	"keyMappings": [
+		"#!no-check",
+		"unmap j",
+		"unmap k",
+		"unmap G",
+		"unmap gg",
+		"unmap /",
+		"",
+		"map Ctrl-v scrollPageDown",
+		"map Cmd-v scrollPageUp",
+		"map Cmd-> scrollToBottom",
+		"map Cmd-< scrollToTop",
+		"map s enterFindMode",
+		""
+	],
+	"vimSync": true
+}
