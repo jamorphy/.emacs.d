@@ -18,12 +18,9 @@
         ("gnu"   . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/gnu/")))
 (package-initialize)
 
-(when (daemonp)
-  (exec-path-from-shell-initialize)
-  (exec-path-from-shell-copy-envs '("PATH")))
-
+(exec-path-from-shell-initialize)
+(exec-path-from-shell-copy-envs '("PATH"))
 (setenv "LIBRARY_PATH" "/opt/homebrew/lib")
-
 
 (unless (bound-and-true-p package--initialized)
   (setq package-enable-at-startup nil) ;; Prevent double-loading packages
@@ -63,6 +60,24 @@
 (setq-default indicate-empty-lines t
               indent-tabs-mode nil
               tab-width 4)
+
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+      (bootstrap-version 6))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-expression (read (current-buffer)))))
+  (load bootstrap-file nil 'nomessage))
+
+;; Install and configure use-package
+(straight-use-package 'use-package)
+(use-package straight
+  :custom (straight-use-package-by-default t))
 
 ;;
 ;; Local packages
@@ -158,6 +173,7 @@
 (setq c-basic-offset 4)
 
 (pm/use 'magit)
+(pm/use 'magit-section)
 
 ;;;
 ;;; Projects
@@ -188,18 +204,22 @@
 (fido-mode t)
 (icomplete-vertical-mode t)
 
+(global-set-key (kbd "C-;") 'ido-switch-buffer)
+
+
 (pm/use 'which-key)
 (which-key-mode)
 
-(global-set-key (kbd "M-i") 'imenu)
-(setq imenu-auto-rescan t)
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(custom-safe-themes
-   '("a12f585b1ff1b35f4000eab71f9f20a784b94f797296de13d467f9b3021b9a8b"
+   '("fbf73690320aa26f8daffdd1210ef234ed1b0c59f3d001f342b9c0bbf49f531c"
+     "2e7dc2838b7941ab9cabaa3b6793286e5134f583c04bde2fba2f4e20f2617cf7"
+     "f5f070872db3e4d8b82dbb2f3b1c60beca86fc93327a38ebddd22070458a14bc"
+     "a12f585b1ff1b35f4000eab71f9f20a784b94f797296de13d467f9b3021b9a8b"
      "e338de851db9cb260207b8b7246761585e79a489c7750110e01c10e216af495f"
      "76c92281dc2f878bce2ab4b4466f76afda48c1ed95dfb3a97da31df39b21491d"
      "882d6a5981fd85d9f987d31623e25e69b8d5635a53ab442f1a51e7c252790320"
@@ -210,7 +230,7 @@
      "623e9fe0532cc3a0bb31929b991a16f72fad7ad9148ba2dc81e395cd70afc744"
      "e8915dac580af7a4a57bd38a0638a5a7714b47714529b1a66bd19e7aa155818d"
      default))
- '(dape-key-prefix [24 1])
+ '(dape-key-prefix [24 1] t)
  '(eglot-ignored-server-capabilities
    '(:hoverProvider :completionProvider :signatureHelpProvider
                     :codeActionProvider :codeLensProvider
@@ -243,170 +263,130 @@
 ;; Org
 ;;
 (load-file "~/.emacs.d/om.el")
-
 (pm/use 'bufferlo)
 
 ;;
 ;; Debug
 ;;
-
 (pm/use 'dape)
 (setq dape-buffer-window-arrangement 'right)
 (setq dape-key-prefix (kbd "C-x C-a"))
 
+(add-to-list 'exec-path "/Users/j/.local/bin")
+
 ;;
 ;; LLMs
 ;;
-
-(load-file "~/.emacs.d/secrets.el")
-
 (global-unset-key (kbd "<C-wheel-up>"))
 (global-unset-key (kbd "<C-wheel-down>"))
 
+(setq straight-repository-branch "develop")
+
+(load-file "~/.emacs.d/ellm.el")
+(setq warning-minimum-level :error)
+
+(pm/use 'rg)
+(rg-enable-default-bindings)
+
+;; Basic org-roam setup - just the essentials
+(use-package org-roam
+  :ensure t
+  :custom
+  (org-roam-directory "~/Workspace/notes")
+  :bind (("C-c n f" . org-roam-node-find)
+         ("C-c n i" . org-roam-node-insert))
+  :config
+  (org-roam-setup))
+
+(use-package org-roam-ui
+  :ensure t
+  :after org-roam
+  :config
+  (setq org-roam-ui-sync-theme t
+        org-roam-ui-follow t
+        org-roam-ui-update-on-save t))
 
 
-(pm/use 'llm)
+(defvar afk-timer nil
+  "Timer used to update the AFK buffer.")
 
-(setq llm-warn-on-nonfree nil)
+(defvar afk-buffer nil
+  "Buffer used to display AFK status.")
 
-(defvar openai-provider (make-llm-openai :key openai-api-key :chat-model "gpt-4o-mini"))
-(defvar groq-provider (make-llm-openai-compatible :url "https://api.groq.com/openai/v1" :key groq-api-key :chat-model "llama-3.1-70b-versatile"))
-(defvar mistral-provider (make-llm-openai-compatible :url "https://api.mistral.ai/v1" :key mistral-api-key :chat-model "mistral-large-2407"))
-(defvar deepseek-provider (make-llm-openai-compatible :url "https://api.deepseek.com" :key deepseek-api-key :chat-model "deepseek-coder"))
-
-(defun llm-quick (provider)
-  "Process the selected region, current line, or prompt with the given LLM PROVIDER and stream the response."
-  (interactive (list my-llm-provider))  ; Default to my-llm-provider when called interactively
-  (let (begin end input-text)
-    (cond
-     ;; If there's an active region, use it
-     ((use-region-p)
-      (setq begin (region-beginning)
-            end (region-end)
-            input-text (buffer-substring-no-properties begin end)))
-     
-     ;; If the current line is non-empty, use it
-     ((not (string-empty-p (string-trim (thing-at-point 'line t))))
-      (setq begin (line-beginning-position)
-            end (line-end-position)
-            input-text (string-trim (buffer-substring-no-properties begin end))))
-     
-     ;; If the current line is empty, prompt for input
-     (t
-      (setq input-text (read-string "Enter text to process: "))
-      (setq begin (point) end (point))))
-
-    (when input-text
-      (when (use-region-p)
-        (delete-region begin end))
-      (save-excursion
-        (goto-char end)
-        (insert "\n\n")
-        (llm-chat-streaming-to-point 
-         provider
-         (llm-make-chat-prompt input-text)
-         (current-buffer)
-         (point)
-         (lambda () 
-           (message "LLM response complete")))))))
-
-(global-set-key (kbd "C-c m") (lambda () (interactive) (llm-quick groq-provider)))
-
-(defvar-local llm-chat-buffer-provider nil
-  "The LLM provider for this chat buffer.")
-
-(defvar-local llm-chat-history nil
-  "The chat history for this buffer.")
-
-(defvar llm-available-providers
-  '(("OpenAI" . openai-provider)
-    ("Llama3.1 70b" . groq-provider)
-    ("deepseek" . deepseek-provider)
-    ("mistral" . mistral-provider))
-  "Alist of available providers and their corresponding variable names.")
-
-(define-derived-mode llm-chat-mode text-mode "LLM Chat"
-  "Major mode for LLM chat buffers."
-  (setq-local llm-chat-history (llm-make-chat-prompt ""))
-  (setq-local llm-chat-buffer-provider nil))
-
-(defun llm-chat-select-provider ()
-  "Prompt the user to select a provider and return a cons of (provider-name . provider-object)."
-  (let* ((provider-name (completing-read "Select provider: "
-                                         (mapcar #'car llm-available-providers)
-                                         nil t))
-         (provider-var (cdr (assoc provider-name llm-available-providers))))
-    (cons provider-name (symbol-value provider-var))))
-
-(defun llm-new-chat ()
-  "Create a new chat buffer and prompt for the provider."
+(defun afk ()
+  "Display an AFK buffer with ASCII art and a timer."
   (interactive)
-  (let* ((provider-info (llm-chat-select-provider))
-         (provider-name (car provider-info))
-         (provider (cdr provider-info))
-         (chat-buffer (generate-new-buffer (format "*JaLLM chat: %s*" provider-name))))
-    (with-current-buffer chat-buffer
-      (llm-chat-mode)
-      (setq-local llm-chat-buffer-provider provider)
-      (insert (format "llm interface (%s), C-c n to send msg, winnable?\n\n" provider-name))
-      (insert "USER: "))
-    (switch-to-buffer chat-buffer)))
+  ;; Cancel any existing timer
+  (when afk-timer
+    (cancel-timer afk-timer)
+    (setq afk-timer nil))
+  
+  ;; Create new buffer
+  (setq afk-buffer (get-buffer-create "*AFK*"))
+  
+  (with-current-buffer afk-buffer
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert "
+                                                                              
+                                        db         88888888888  88      a8P   
+                                       d88b        88           88    ,88'    
+                                      d8'`8b       88           88  ,88\"      
+                                     d8'  `8b      88aaaaa      88,d88'       
+                                    d8YaaaaY8b     88\"\"\"\"\"      8888\"88,      
+                                   d8\"\"\"\"\"\"\"\"8b    88           88P   Y8b     
+                                  d8'        `8b   88           88     \"88,   
+                                 d8'          `8b  88           88       Y8b  
+                                                                              
+                                                                              
+")
+      (insert "Time away: 0s\n"))
+    
+    ;; Set up buffer properties
+    (read-only-mode 1)
+    (use-local-map (make-sparse-keymap))
+    (local-set-key "q" 'afk-quit))
+  
+  ;; Set up the timer to update every second
+  (setq afk-timer 
+        (run-at-time t 1 'afk-update-timer))
+  
+  ;; Display the buffer
+  (switch-to-buffer afk-buffer))
 
-(defvar-local llm-chat-response-start nil
-  "Marker for the start of the assistant's response in the chat buffer.")
-
-
-
-(defun llm-chat-send-message ()
-  "Send the message in the input area of the chat buffer, keeping the cursor at the end of the stream."
+(defun afk-quit ()
+  "Quit the AFK mode and clean up."
   (interactive)
-  (let* ((provider llm-chat-buffer-provider)
-         (last-user-prompt (save-excursion
-                             (goto-char (point-max))
-                             (search-backward "USER: " nil t)
-                             (point)))
-         (input (buffer-substring-no-properties 
-                 (+ last-user-prompt (length "USER: "))
-                 (point-max))))
-    (when (string-empty-p (string-trim input))
-      (user-error "Message is empty"))
-    
-    ;; Append user message to history
-    (llm-chat-prompt-append-response llm-chat-history input)
-    
-    ;; Add two newlines after the user's message
-    (goto-char (point-max))
-    (insert "\n\n")
-    
-    ;; Prepare buffer for AI response
-    (insert "ASSISTANT: ")
-    (setq-local llm-chat-response-start (point-marker))
-    
-    ;; Function to update cursor position
-    (defun llm-chat-update-cursor (&rest _)
-      (goto-char (point-max))
-      (recenter -1))
-    
-    ;; Add hook to update cursor after each change
-    (add-hook 'after-change-functions #'llm-chat-update-cursor nil t)
-    
-    (llm-chat-streaming-to-point
-     provider
-     llm-chat-history
-     (current-buffer)
-     (point-max)
-     (lambda ()
-       (save-excursion
-         (goto-char (point-max))
-         ;; Add two newlines after the assistant's response
-         (insert "\n\n")
-         (insert "USER: ")
-         (llm-chat-prompt-append-response 
-          llm-chat-history 
-          (buffer-substring-no-properties llm-chat-response-start (point-max)) 
-          'assistant))
-       ;; Move cursor to the next USER: prompt
-       (goto-char (point-max))
-       ;; Remove the hook after streaming is complete
-       (remove-hook 'after-change-functions #'llm-chat-update-cursor t)))))
-(define-key llm-chat-mode-map (kbd "C-c n") #'llm-chat-send-message)
+  (when afk-timer 
+    (cancel-timer afk-timer)
+    (setq afk-timer nil))
+  (when (buffer-live-p afk-buffer)
+    (kill-buffer afk-buffer)))
+
+(defun afk-update-timer ()
+  "Update the timer in the AFK buffer."
+  (when (buffer-live-p afk-buffer)
+    (with-current-buffer afk-buffer
+      (let ((inhibit-read-only t))
+        (goto-char (point-min))
+        (if (re-search-forward "Time away: \\([0-9]+\\)s" nil t)
+            (let ((seconds (1+ (string-to-number (match-string 1)))))
+              (replace-match (format "Time away: %ds" seconds)))
+          ;; If pattern not found, reset the buffer
+          (erase-buffer)
+          (insert "
+                                                                              
+                                        db         88888888888  88      a8P   
+                                       d88b        88           88    ,88'    
+                                      d8'`8b       88           88  ,88\"      
+                                     d8'  `8b      88aaaaa      88,d88'       
+                                    d8YaaaaY8b     88\"\"\"\"\"      8888\"88,      
+                                   d8\"\"\"\"\"\"\"\"8b    88           88P   Y8b     
+                                  d8'        `8b   88           88     \"88,   
+                                 d8'          `8b  88           88       Y8b  
+                                                                              
+                                                                              
+")
+          (insert "Time away: 0s\n"))))))
+
+(provide 'afk)
