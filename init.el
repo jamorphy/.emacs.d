@@ -155,9 +155,6 @@
 (pm/use 'move-text)
 (move-text-default-bindings)
 
-(pm/use 'expand-region)
-(global-set-key (kbd "M-;") 'er/expand-region)
-
 ;;;
 ;;; Programming Modes
 ;;;
@@ -272,6 +269,30 @@
 (setq dape-buffer-window-arrangement 'right)
 (setq dape-key-prefix (kbd "C-x C-a"))
 
+
+(pm/use 'vterm)
+(defun vterm-jump ()
+  "Jump to the most recently used vterm buffer, or create one if none exist."
+  (interactive)
+  (let ((vterm-buffers (seq-filter (lambda (buf)
+                                     (string-match-p "\\*vterm\\*" (buffer-name buf)))
+                                   (buffer-list))))
+    (if vterm-buffers
+        ;; Switch to the most recently used vterm buffer (first in list)
+        (switch-to-buffer (car vterm-buffers))
+      ;; If no vterm exists, start a new one
+      (vterm))))
+
+(global-set-key (kbd "M-;") 'vterm-jump)
+(add-hook 'vterm-mode-hook (lambda () (display-line-numbers-mode -1)))
+
+;;
+;; Kill-ring
+;;
+(pm/use 'browse-kill-ring)
+(global-unset-key (kbd " M-y"))
+(global-set-key (kbd " M-y") 'browse-kill-ring)
+
 (add-to-list 'exec-path "/Users/j/.local/bin")
 
 ;;
@@ -281,6 +302,9 @@
 (global-unset-key (kbd "<C-wheel-down>"))
 
 (setq straight-repository-branch "develop")
+
+(setq display-line-numbers-type 'relative)
+(global-display-line-numbers-mode +1)
 
 (load-file "~/.emacs.d/ellm.el")
 (setq warning-minimum-level :error)

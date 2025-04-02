@@ -108,3 +108,44 @@
                                   (llm-stream (current-buffer) "")))
 
 (global-set-key (kbd "C-c C-l") 'llm-new-chat)
+
+;;; -*- lexical-binding: t -*-
+
+(defun llm-fetch-models-to-kill-ring ()
+  "Fetch available models from the LLM server and add the selected one to the kill ring."
+  (interactive)
+  (let ((buf (get-buffer-create "*llm-temp*")))
+    (with-current-buffer buf
+      (erase-buffer)
+      (let ((proc (condition-case err
+                      (make-network-process :name "llm-models"
+                                            :buffer buf
+                                            :host "localhost"
+                                            :service 9999
+                                            :family 'ipv4)
+                    (error
+                     (message "Failed to connect to LLM server: %s" (error-message-string err))
+                     nil))))
+        (if (not proc)
+            (message "Could not connect to server at localhost:9999")
+          (process-send-string proc "list-models\n")
+          (process-send-eof proc)
+          (set-process-filter proc
+                              (lambda (proc string)
+                                (when (buffer-live-p (process-buffer proc))
+                                  (with-current-buffer (process-buffer proc)
+                                    (insert string)))))
+          (accept-process-output proc 5)  ;; Wait up to 5 seconds
+          (while (process-live-p proc)
+            (accept-process-output proc 1))
+          (goto-char (point-min))
+          (let ((models (split-string (buffer-string) "\n" t)))
+            (kill-buffer buf)
+            (if (not models)
+                (message "No models received from server")
+              (let ((selected-model (completing-read "Select model to copy: " models nil t)))
+                (kill-new selected-model)
+                (message "Model '%s' added to kill ring" selected-model)))))))))
+
+;; Optional keybinding
+(global-set-key (kbd "C-c C-m") 'llm-fetch-models-to-kill-ring)
