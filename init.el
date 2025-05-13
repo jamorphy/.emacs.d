@@ -172,9 +172,22 @@
 (pm/use 'magit)
 (pm/use 'magit-section)
 
+(pm/use 'wgsl-mode)
+(pm/use 'glsl-mode)
+(pm/use 'zig-mode)
+
+(defun js-ts-indent ()
+  (setq-local tab-width 2)
+  (setq-local js-indent-level 2)
+  (setq-local typescript-indent-level 2))
+
+(add-hook 'js-mode-hook #'js-ts-indent)
+(add-hook 'typescript-mode-hook #'js-ts-indent)
+
+(pm/use 'typescript-mode)
+
 ;;;
 ;;; Projects
-;;; TODO
 
 ;;;
 ;;; Compilation
@@ -254,6 +267,7 @@
 ;; LSP
 ;;
 (add-hook 'eglot--managed-mode-hook (lambda () (flymake-mode -1)))
+(remove-hook 'prog-mode-hook 'flymake-mode) ;; TODO: fix
 (add-hook 'prog-mode-hook 'eglot-ensure)
 
 ;;
