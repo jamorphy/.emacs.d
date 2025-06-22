@@ -15,7 +15,10 @@
 (setq package-archives
       '(("melpa" . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/melpa/")
         ("org"   . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/org/")
-        ("gnu"   . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/gnu/")))
+        ("gnu"   . "https://raw.githubusercontent.com/d12frosted/elpa-mirror/master/gnu/")
+        
+        ("gnu-devel" . "https://elpa.gnu.org/devel/") ;; for eglot bleeding edge
+        ))
 (package-initialize)
 
 (exec-path-from-shell-initialize)
@@ -85,7 +88,7 @@
 (add-to-list 'load-path "~/.emacs.d/custom/")
 
 (pm/use 'base16-theme)
-(load-theme 'base16-zenburn t)
+(load-theme 'vs-light t)
 
 (setq native-comp-async-report-warnings-errors 'silent)
 
@@ -183,6 +186,7 @@
 
 (add-hook 'js-mode-hook #'js-ts-indent)
 (add-hook 'typescript-mode-hook #'js-ts-indent)
+(add-hook 'html-mode-hook #'js-ts-indent)
 
 (pm/use 'typescript-mode)
 
@@ -226,7 +230,8 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(custom-safe-themes
-   '("fbf73690320aa26f8daffdd1210ef234ed1b0c59f3d001f342b9c0bbf49f531c"
+   '("dea106ab256a8017a325f51f01b1131915989fa25db48eb831ffb18dac8ecd39"
+     "fbf73690320aa26f8daffdd1210ef234ed1b0c59f3d001f342b9c0bbf49f531c"
      "2e7dc2838b7941ab9cabaa3b6793286e5134f583c04bde2fba2f4e20f2617cf7"
      "f5f070872db3e4d8b82dbb2f3b1c60beca86fc93327a38ebddd22070458a14bc"
      "a12f585b1ff1b35f4000eab71f9f20a784b94f797296de13d467f9b3021b9a8b"
@@ -266,9 +271,20 @@
 ;;
 ;; LSP
 ;;
-(add-hook 'eglot--managed-mode-hook (lambda () (flymake-mode -1)))
-(remove-hook 'prog-mode-hook 'flymake-mode) ;; TODO: fix
+
+(add-hook 'programming-mode-hook #'flymake-mode)
 (add-hook 'prog-mode-hook 'eglot-ensure)
+
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((typescript-mode tsx-ts-mode typescript-ts-mode)
+                 . ("vtsls" "--stdio"))))
+
+;;
+;; Flymake
+;;
+(global-set-key (kbd "C-c e b") 'flymake-show-buffer-diagnostics)
+(global-set-key (kbd "C-c e p") 'flymake-show-project-diagnostics)
 
 ;;
 ;; Org
@@ -282,23 +298,6 @@
 (pm/use 'dape)
 (setq dape-buffer-window-arrangement 'right)
 (setq dape-key-prefix (kbd "C-x C-a"))
-
-
-(pm/use 'vterm)
-(defun vterm-jump ()
-  "Jump to the most recently used vterm buffer, or create one if none exist."
-  (interactive)
-  (let ((vterm-buffers (seq-filter (lambda (buf)
-                                     (string-match-p "\\*vterm\\*" (buffer-name buf)))
-                                   (buffer-list))))
-    (if vterm-buffers
-        ;; Switch to the most recently used vterm buffer (first in list)
-        (switch-to-buffer (car vterm-buffers))
-      ;; If no vterm exists, start a new one
-      (vterm))))
-
-(global-set-key (kbd "M-;") 'vterm-jump)
-(add-hook 'vterm-mode-hook (lambda () (display-line-numbers-mode -1)))
 
 ;;
 ;; Kill-ring
@@ -344,87 +343,4 @@
         org-roam-ui-follow t
         org-roam-ui-update-on-save t))
 
-
-(defvar afk-timer nil
-  "Timer used to update the AFK buffer.")
-
-(defvar afk-buffer nil
-  "Buffer used to display AFK status.")
-
-(defun afk ()
-  "Display an AFK buffer with ASCII art and a timer."
-  (interactive)
-  ;; Cancel any existing timer
-  (when afk-timer
-    (cancel-timer afk-timer)
-    (setq afk-timer nil))
-  
-  ;; Create new buffer
-  (setq afk-buffer (get-buffer-create "*AFK*"))
-  
-  (with-current-buffer afk-buffer
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-      (insert "
-                                                                              
-                                        db         88888888888  88      a8P   
-                                       d88b        88           88    ,88'    
-                                      d8'`8b       88           88  ,88\"      
-                                     d8'  `8b      88aaaaa      88,d88'       
-                                    d8YaaaaY8b     88\"\"\"\"\"      8888\"88,      
-                                   d8\"\"\"\"\"\"\"\"8b    88           88P   Y8b     
-                                  d8'        `8b   88           88     \"88,   
-                                 d8'          `8b  88           88       Y8b  
-                                                                              
-                                                                              
-")
-      (insert "Time away: 0s\n"))
-    
-    ;; Set up buffer properties
-    (read-only-mode 1)
-    (use-local-map (make-sparse-keymap))
-    (local-set-key "q" 'afk-quit))
-  
-  ;; Set up the timer to update every second
-  (setq afk-timer 
-        (run-at-time t 1 'afk-update-timer))
-  
-  ;; Display the buffer
-  (switch-to-buffer afk-buffer))
-
-(defun afk-quit ()
-  "Quit the AFK mode and clean up."
-  (interactive)
-  (when afk-timer 
-    (cancel-timer afk-timer)
-    (setq afk-timer nil))
-  (when (buffer-live-p afk-buffer)
-    (kill-buffer afk-buffer)))
-
-(defun afk-update-timer ()
-  "Update the timer in the AFK buffer."
-  (when (buffer-live-p afk-buffer)
-    (with-current-buffer afk-buffer
-      (let ((inhibit-read-only t))
-        (goto-char (point-min))
-        (if (re-search-forward "Time away: \\([0-9]+\\)s" nil t)
-            (let ((seconds (1+ (string-to-number (match-string 1)))))
-              (replace-match (format "Time away: %ds" seconds)))
-          ;; If pattern not found, reset the buffer
-          (erase-buffer)
-          (insert "
-                                                                              
-                                        db         88888888888  88      a8P   
-                                       d88b        88           88    ,88'    
-                                      d8'`8b       88           88  ,88\"      
-                                     d8'  `8b      88aaaaa      88,d88'       
-                                    d8YaaaaY8b     88\"\"\"\"\"      8888\"88,      
-                                   d8\"\"\"\"\"\"\"\"8b    88           88P   Y8b     
-                                  d8'        `8b   88           88     \"88,   
-                                 d8'          `8b  88           88       Y8b  
-                                                                              
-                                                                              
-")
-          (insert "Time away: 0s\n"))))))
-
-(provide 'afk)
+;; TODO: what is treesitter
