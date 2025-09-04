@@ -99,7 +99,6 @@
 ;;; OS Specific
 ;;;
 (defvar cfg-loc "")
-(defvar dump-loc "")
 (set-frame-font "Terminus (TTF) 16" nil t)
 
 (when (eq system-type 'windows-nt)
@@ -109,8 +108,7 @@
 
 (when (eq system-type 'darwin)
   (setq mac-command-modifier 'meta)
-  (setq cfg-loc "~/.emacs.d/init.el")
-  (setq dump-loc "~/Workspace/sync/dump.org"))
+  (setq cfg-loc "~/.emacs.d/init.el"))
   
 (when (eq system-type 'gnu/linux)
   (setq cfg-loc "~/.emacs.d/init.el")
@@ -206,10 +204,6 @@
   "Open the `.emacs` or `init.el`."
   (interactive)
   (find-file cfg-loc))
-(defun dump ()
-  "Open dump.org"
-  (interactive)
-  (find-file dump-loc))
 
 ;;;
 ;;; UI
@@ -343,4 +337,4 @@
         org-roam-ui-follow t
         org-roam-ui-update-on-save t))
 
-;; TODO: what is treesitter
+(load "~/.emacs.d/odin-mode.el")
